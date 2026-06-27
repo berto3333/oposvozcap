@@ -23,7 +23,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'   # recomendado para Gradle/Android recientes
+          java-version: '21'   # recomendado para Gradle/Android recientes
 
       - name: Install npm dependencies
         run: |
