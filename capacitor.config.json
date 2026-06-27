@@ -1,0 +1,10 @@
+{
+  "appId": "com.oposvozcap.app",
+  "appName": "oposvozcap",
+  "webDir": "dist",
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": false
+    }
+  }
+}

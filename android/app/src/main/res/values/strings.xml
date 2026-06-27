@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">oposvozcap</string>
+    <string name="title_activity_main">oposvozcap</string>
+    <string name="package_name">com.oposvozcap.app</string>
+    <string name="custom_url_scheme">com.oposvozcap.app</string>
+</resources>
