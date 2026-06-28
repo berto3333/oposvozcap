@@ -30,6 +30,10 @@
         border-radius: 4px;
         cursor: pointer;
       }
+      #btn-cargar {
+        background: #9c27b0;
+        color: white;
+      }
       #btn-leer {
         background: #1976d2;
         color: white;
@@ -71,9 +75,12 @@
     <div id="puntuacion">Puntuación: 0.00</div>
 
     <div class="card">
-      <div id="pregunta-texto">Cargando preguntas…</div>
+      <div id="pregunta-texto">Carga un fichero de preguntas para empezar.</div>
       <div id="opciones"></div>
     </div>
+
+    <button id="btn-cargar">Cargar preguntas (.dat)</button>
+    <input id="file-input" type="file" accept=".dat,.json" style="display:none" />
 
     <button id="btn-leer">Leer pregunta</button>
     <button id="btn-voz">Responder por voz</button>
@@ -97,6 +104,8 @@
       const estado = document.getElementById('estado');
       const logDiv = document.getElementById('log');
 
+      const btnCargar = document.getElementById('btn-cargar');
+      const fileInput = document.getElementById('file-input');
       const btnLeer = document.getElementById('btn-leer');
       const btnVoz = document.getElementById('btn-voz');
       const btnParar = document.getElementById('btn-parar');
@@ -116,7 +125,8 @@
 
       function mostrarPregunta() {
         if (preguntas.length === 0) {
-          preguntaTexto.textContent = 'No hay preguntas cargadas.';
+          preguntaTexto.textContent =
+            'No hay preguntas cargadas. Pulsa "Cargar preguntas".';
           opcionesDiv.innerHTML = '';
           return;
         }
@@ -137,11 +147,14 @@
         });
 
         estado.textContent =
-          'Estado: pregunta mostrada. Pulsa "Leer pregunta" o "Responder por voz".';
+          'Pregunta mostrada. Pulsa "Leer pregunta" o "Responder por voz".';
       }
 
       async function leerPreguntaActual() {
-        if (preguntas.length === 0) return;
+        if (preguntas.length === 0) {
+          estado.textContent = 'No hay preguntas cargadas.';
+          return;
+        }
         const p = preguntas[indiceActual];
 
         const letras = ['a', 'b', 'c', 'd'];
@@ -254,6 +267,11 @@
 
       async function startListeningComando() {
         try {
+          if (preguntas.length === 0) {
+            estado.textContent = 'No hay preguntas cargadas.';
+            return;
+          }
+
           await ensurePermissions();
 
           if (escuchando) {
@@ -335,24 +353,46 @@
         }
       }
 
-      async function cargarPreguntas() {
-        try {
-          const resp = await fetch('/preguntas.dat');
-          if (!resp.ok) {
-            throw new Error('No se pudo cargar preguntas.dat');
-          }
-          preguntas = await resp.json();
-          logLine(`Cargadas ${preguntas.length} preguntas.`);
-          indiceActual = 0;
-          actualizarPuntuacion();
-          mostrarPregunta();
-        } catch (err) {
-          console.error(err);
-          preguntaTexto.textContent = 'Error cargando preguntas.dat';
-          estado.textContent = 'No se pudieron cargar las preguntas.';
-          logLine('Error al cargar preguntas: ' + (err?.message || String(err)));
+      // Cargar preguntas desde un fichero local (.dat/.json)
+      btnCargar.onclick = () => {
+        fileInput.click();
+      };
+
+      fileInput.onchange = () => {
+        const file = fileInput.files?.[0];
+        if (!file) {
+          estado.textContent = 'No se ha seleccionado ningún fichero.';
+          return;
         }
-      }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const contenido = reader.result;
+            const json = JSON.parse(contenido);
+            if (!Array.isArray(json)) {
+              throw new Error('El fichero no contiene un array de preguntas.');
+            }
+            preguntas = json;
+            indiceActual = 0;
+            puntuacion = 0;
+            actualizarPuntuacion();
+            mostrarPregunta();
+            estado.textContent = `Preguntas cargadas desde fichero (${preguntas.length} preguntas).`;
+            logLine(
+              `Cargadas ${preguntas.length} preguntas desde fichero local.`
+            );
+          } catch (err) {
+            console.error(err);
+            estado.textContent = 'Error leyendo el fichero de preguntas.';
+            logLine('Error leyendo fichero: ' + (err?.message || String(err)));
+          }
+        };
+        reader.onerror = () => {
+          estado.textContent = 'Error leyendo el fichero.';
+        };
+        reader.readAsText(file, 'utf-8');
+      };
 
       btnLeer.onclick = () => {
         leerPreguntaActual();
@@ -365,8 +405,6 @@
       btnParar.onclick = () => {
         stopListening();
       };
-
-      cargarPreguntas();
     </script>
   </body>
 </html>
