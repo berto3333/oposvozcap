@@ -141,7 +141,7 @@
           return;
         }
 
-        const p = preguntas[ordenPreguntas[indiceActual]];
+        const p = flujoActivo ? preguntas[ordenPreguntas[indiceActual]] : preguntas[indiceActual];
         preguntaTexto.textContent = `(${indiceActual + 1}/${preguntas.length}) ${p.texto}`;
 
         opcionesDiv.innerHTML = '';
@@ -374,7 +374,7 @@
             sesionTerminada = true;
             escuchando = false;
             await detenerReconocimiento();
-            const p = preguntas[ordenPreguntas[indiceActual]];
+        const p = flujoActivo ? preguntas[ordenPreguntas[indiceActual]] : preguntas[indiceActual];
             estado.textContent = 'Tiempo agotado. Pregunta ' + p.id + ' no respondida (0 puntos).';
             logLine('Pregunta ' + p.id + ': timeout (0 puntos).');
             await new Promise(r => setTimeout(r, 1500));
