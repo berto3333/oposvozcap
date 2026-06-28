@@ -175,7 +175,7 @@
 
         await TextToSpeech.speak({
           text: textoTTS,
-          locale: 'es-ES',
+          lang: 'es-ES',
           rate: 1.0
         });
 
@@ -330,7 +330,7 @@
           });
 
           await SpeechRecognition.start({
-            locale: 'es-ES',
+            language: 'es-ES',
             partialResults: true
           });
         } catch (err) {
