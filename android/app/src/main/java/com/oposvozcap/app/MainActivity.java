@@ -1,15 +1,5 @@
-import com.getcapacitor.community.speechrecognition.SpeechRecognition;
+package com.oposvozcap.app;
 
-public class MainActivity extends BridgeActivity {
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+import com.getcapacitor.BridgeActivity;
 
-        this.init(
-            savedInstanceState,
-            new ArrayList<Class<? extends Plugin>>() {{
-                add(SpeechRecognition.class);
-            }}
-        );
-    }
-}
+public class MainActivity extends BridgeActivity {}
