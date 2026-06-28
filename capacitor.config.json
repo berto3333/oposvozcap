@@ -1,10 +1,10 @@
-{
-  "appId": "com.oposvozcap.app",
-  "appName": "oposvozcap",
-  "webDir": "dist",
-  "plugins": {
-    "SplashScreen": {
-      "launchAutoHide": false
-    }
-  }
-}
+import { CapacitorConfig } from '@capacitor/cli';
+
+const config: CapacitorConfig = {
+  appId: 'es.alberto.oposvozcap',
+  appName: 'oposvozcap',
+  webDir: 'dist', // ajusta si tu build genera otra carpeta (build/www)
+  bundledWebRuntime: false,
+};
+
+export default config;
