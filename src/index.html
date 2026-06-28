@@ -100,6 +100,22 @@
       let timeoutId = null;
       let sesionTerminada = false;
       let ordenPreguntas = [];
+      let wakeLockObj = null;
+
+      async function adquirirWakeLock() {
+        try {
+          wakeLockObj = await navigator.wakeLock.request('screen');
+        } catch (e) {
+          logLine('WakeLock no disponible: ' + e.message);
+        }
+      }
+
+      function liberarWakeLock() {
+        if (wakeLockObj) {
+          try { wakeLockObj.release(); } catch (e) { /* ignore */ }
+          wakeLockObj = null;
+        }
+      }
 
       const preguntaTexto = document.getElementById('pregunta-texto');
       const opcionesDiv = document.getElementById('opciones');
@@ -261,6 +277,7 @@
           btnEmpezar.disabled = false;
           btnParar.disabled = true;
           estado.textContent = 'Test completado. Puntuación final: ' + puntuacion.toFixed(2);
+          liberarWakeLock();
           logLine('Fin del test.');
           return true;
         }
@@ -408,6 +425,7 @@
         btnParar.disabled = false;
         actualizarPuntuacion();
         mostrarPregunta();
+        await adquirirWakeLock();
         logLine('--- INICIO DEL TEST ---');
 
         await iniciarCiclo();
@@ -420,6 +438,7 @@
         btnEmpezar.disabled = false;
         btnParar.disabled = true;
         estado.textContent = 'Test detenido.';
+        liberarWakeLock();
         logLine('Test detenido por el usuario.');
       }
 
