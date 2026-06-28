@@ -99,6 +99,7 @@
       let flujoActivo = false;
       let timeoutId = null;
       let sesionTerminada = false;
+      let ordenPreguntas = [];
 
       const preguntaTexto = document.getElementById('pregunta-texto');
       const opcionesDiv = document.getElementById('opciones');
@@ -124,6 +125,15 @@
         puntuacionDiv.textContent = 'Puntuación: ' + puntuacion.toFixed(2);
       }
 
+      function barajar(array) {
+        const copia = [...array];
+        for (let i = copia.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [copia[i], copia[j]] = [copia[j], copia[i]];
+        }
+        return copia;
+      }
+
       function mostrarPregunta() {
         if (preguntas.length === 0) {
           preguntaTexto.textContent = 'No hay preguntas cargadas. Pulsa "Cargar preguntas".';
@@ -131,7 +141,7 @@
           return;
         }
 
-        const p = preguntas[indiceActual];
+        const p = preguntas[ordenPreguntas[indiceActual]];
         preguntaTexto.textContent = `(${indiceActual + 1}/${preguntas.length}) ${p.texto}`;
 
         opcionesDiv.innerHTML = '';
@@ -199,7 +209,7 @@
       }
 
       async function corregirRespuestaVoz(valor) {
-        const p = preguntas[indiceActual];
+        const p = preguntas[ordenPreguntas[indiceActual]];
 
         if (valor === p.correcta) {
           puntuacion += 0.25;
@@ -219,7 +229,7 @@
           estado.textContent = 'No hay preguntas cargadas.';
           return;
         }
-        const p = preguntas[indiceActual];
+        const p = preguntas[ordenPreguntas[indiceActual]];
 
         const letras = ['a', 'b', 'c', 'd'];
         const partesOpciones = letras
@@ -277,7 +287,7 @@
           await iniciarCiclo();
 
         } else if (comando.tipo === 'pasar') {
-          const p = preguntas[indiceActual];
+          const p = preguntas[ordenPreguntas[indiceActual]];
           estado.textContent = 'Pregunta ' + p.id + ' pasada sin responder.';
           logLine('Pregunta ' + p.id + ': pasada (0 puntos).');
           await new Promise(r => setTimeout(r, 1500));
@@ -364,7 +374,7 @@
             sesionTerminada = true;
             escuchando = false;
             await detenerReconocimiento();
-            const p = preguntas[indiceActual];
+            const p = preguntas[ordenPreguntas[indiceActual]];
             estado.textContent = 'Tiempo agotado. Pregunta ' + p.id + ' no respondida (0 puntos).';
             logLine('Pregunta ' + p.id + ': timeout (0 puntos).');
             await new Promise(r => setTimeout(r, 1500));
@@ -392,6 +402,7 @@
 
         indiceActual = 0;
         puntuacion = 0;
+        ordenPreguntas = barajar(preguntas.map((_, i) => i));
         flujoActivo = true;
         btnEmpezar.disabled = true;
         btnParar.disabled = false;
