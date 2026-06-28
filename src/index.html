@@ -98,6 +98,7 @@
       let escuchando = false;
       let flujoActivo = false;
       let timeoutId = null;
+      let sesionTerminada = false;
 
       const preguntaTexto = document.getElementById('pregunta-texto');
       const opcionesDiv = document.getElementById('opciones');
@@ -172,7 +173,7 @@
 
       function parseComando(textoRaw) {
         const texto = textoRaw.toLowerCase();
-        logLine('parseComando texto=' + texto);
+        logLine('→ parseComando: "' + texto + '"');
 
         if (texto.includes('repetir') || texto.includes('repita')) {
           return { tipo: 'repetir' };
@@ -202,12 +203,12 @@
 
         if (valor === p.correcta) {
           puntuacion += 0.25;
-          estado.textContent = `✅ Correcta (${valor.toUpperCase()}). +0.25 puntos.`;
-          logLine(`Pregunta ${p.id}: correcta (${valor}).`);
+          estado.textContent = 'Correcta (' + valor.toUpperCase() + '). +0.25 puntos.';
+          logLine('Pregunta ' + p.id + ': correcta (' + valor + ').');
         } else {
           puntuacion -= 0.1;
-          estado.textContent = `❌ Incorrecta (${valor.toUpperCase()}). −0.1 puntos. Correcta era ${p.correcta.toUpperCase()}.`;
-          logLine(`Pregunta ${p.id}: incorrecta (${valor}), correcta (${p.correcta}).`);
+          estado.textContent = 'Incorrecta (' + valor.toUpperCase() + '). −0.1 puntos. Correcta era ' + p.correcta.toUpperCase() + '.';
+          logLine('Pregunta ' + p.id + ': incorrecta (' + valor + '), correcta (' + p.correcta + ').');
         }
 
         actualizarPuntuacion();
@@ -225,12 +226,12 @@
           .map((letra) => {
             const textoOpcion = p.opciones[letra];
             if (!textoOpcion) return null;
-            return `Opción ${letra.toUpperCase()}: ${textoOpcion}.`;
+            return 'Opción ' + letra.toUpperCase() + ': ' + textoOpcion + '.';
           })
           .filter(Boolean);
 
         const textoTTS =
-          `Pregunta ${indiceActual + 1}. ${p.texto}. ` +
+          'Pregunta ' + (indiceActual + 1) + '. ' + p.texto + '. ' +
           partesOpciones.join(' ') +
           ' Di A, B, C o D para responder. Di repetir para repetir la pregunta, o di pasar para ir a la siguiente.';
 
@@ -249,7 +250,7 @@
           flujoActivo = false;
           btnEmpezar.disabled = false;
           btnParar.disabled = true;
-          estado.textContent = `🎯 Test completado. Puntuación final: ${puntuacion.toFixed(2)}`;
+          estado.textContent = 'Test completado. Puntuación final: ' + puntuacion.toFixed(2);
           logLine('Fin del test.');
           return true;
         }
@@ -257,10 +258,45 @@
         return false;
       }
 
+      async function procesarResultado(texto) {
+        if (!flujoActivo) return;
+
+        const comando = parseComando(texto);
+
+        if (comando.tipo === 'respuesta') {
+          await corregirRespuestaVoz(comando.valor);
+          await new Promise(r => setTimeout(r, 2000));
+          if (!flujoActivo) return;
+          const fin = await avanzarSiguiente();
+          if (!fin) await iniciarCiclo();
+
+        } else if (comando.tipo === 'repetir') {
+          estado.textContent = 'Repitiendo pregunta…';
+          await new Promise(r => setTimeout(r, 500));
+          if (!flujoActivo) return;
+          await iniciarCiclo();
+
+        } else if (comando.tipo === 'pasar') {
+          const p = preguntas[indiceActual];
+          estado.textContent = 'Pregunta ' + p.id + ' pasada sin responder.';
+          logLine('Pregunta ' + p.id + ': pasada (0 puntos).');
+          await new Promise(r => setTimeout(r, 1500));
+          if (!flujoActivo) return;
+          const fin = await avanzarSiguiente();
+          if (!fin) await iniciarCiclo();
+
+        } else {
+          estado.textContent = 'No se ha entendido: "' + texto.substring(0, 60) + '". Di A, B, C, D, repetir o pasar.';
+          await new Promise(r => setTimeout(r, 1500));
+          if (!flujoActivo) return;
+          await escucharComando();
+        }
+      }
+
       async function iniciarCiclo() {
         if (!flujoActivo) return;
 
-        estado.textContent = `Leyendo pregunta ${indiceActual + 1} de ${preguntas.length}...`;
+        estado.textContent = 'Leyendo pregunta ' + (indiceActual + 1) + ' de ' + preguntas.length + '...';
         await leerPreguntaActual();
 
         if (!flujoActivo) return;
@@ -277,73 +313,44 @@
           if (escuchando) return;
 
           escuchando = true;
-          estado.textContent = 'Escuchando… Di A, B, C, D, repetir o pasar.';
+          sesionTerminada = false;
+          estado.textContent = 'Escuchando…';
 
           SpeechRecognition.removeAllListeners?.();
 
           let bufferTexto = '';
 
           SpeechRecognition.addListener('partialResults', (data) => {
-            const text = data.value || data.matches || '';
+            const text = data.matches || '';
             const finalText = Array.isArray(text) ? text.join(' ') : text;
             if (finalText) {
               bufferTexto = finalText;
+              logLine('Reconociendo: ' + finalText);
             }
           });
 
-          SpeechRecognition.addListener('results', async (data) => {
-            if (!flujoActivo) return;
-
-            const text = data.value || data.matches || '';
-            const finalText = Array.isArray(text) ? text.join(' ') : text;
-            logLine('results: ' + finalText);
-
-            const comando = parseComando(finalText || bufferTexto);
-
-            if (comando.tipo === 'respuesta') {
-              limpiarTimeout();
+          SpeechRecognition.addListener('listeningState', async (data) => {
+            if (data.state === 'stopped' && flujoActivo && !sesionTerminada) {
+              sesionTerminada = true;
               escuchando = false;
-              await corregirRespuestaVoz(comando.valor);
-              await new Promise(r => setTimeout(r, 2000));
-              if (!flujoActivo) return;
-              const fin = await avanzarSiguiente();
-              if (!fin) await iniciarCiclo();
-
-            } else if (comando.tipo === 'repetir') {
               limpiarTimeout();
-              escuchando = false;
-              estado.textContent = 'Repitiendo pregunta…';
-              await new Promise(r => setTimeout(r, 500));
-              if (!flujoActivo) return;
-              await iniciarCiclo();
 
-            } else if (comando.tipo === 'pasar') {
-              limpiarTimeout();
-              escuchando = false;
-              const p = preguntas[indiceActual];
-              estado.textContent = `Pregunta ${p.id} pasada sin responder.`;
-              logLine(`Pregunta ${p.id}: pasada (0 puntos).`);
-              await new Promise(r => setTimeout(r, 1500));
-              if (!flujoActivo) return;
-              const fin = await avanzarSiguiente();
-              if (!fin) await iniciarCiclo();
-
-            } else {
-              estado.textContent = 'No se ha entendido. Di A, B, C, D, repetir o pasar.';
+              if (bufferTexto) {
+                logLine('Detectado: ' + bufferTexto);
+                await procesarResultado(bufferTexto);
+              }
             }
           });
 
           SpeechRecognition.addListener('error', (data) => {
             logLine('error: ' + JSON.stringify(data));
-            escuchando = false;
-            if (flujoActivo) {
+            if (flujoActivo && !sesionTerminada) {
+              sesionTerminada = true;
+              escuchando = false;
+              limpiarTimeout();
               estado.textContent = 'Error en reconocimiento. Reintentando…';
               setTimeout(() => { if (flujoActivo) iniciarCiclo(); }, 1500);
             }
-          });
-
-          SpeechRecognition.addListener('speechEnd', () => {
-            logLine('speechEnd');
           });
 
           await SpeechRecognition.start({
@@ -353,12 +360,13 @@
 
           limpiarTimeout();
           timeoutId = setTimeout(async () => {
-            if (!flujoActivo || !escuchando) return;
+            if (!flujoActivo || sesionTerminada) return;
+            sesionTerminada = true;
             escuchando = false;
             await detenerReconocimiento();
             const p = preguntas[indiceActual];
-            estado.textContent = `⏱ Tiempo agotado. Pregunta ${p.id} no respondida (0 puntos).`;
-            logLine(`Pregunta ${p.id}: timeout (0 puntos).`);
+            estado.textContent = 'Tiempo agotado. Pregunta ' + p.id + ' no respondida (0 puntos).';
+            logLine('Pregunta ' + p.id + ': timeout (0 puntos).');
             await new Promise(r => setTimeout(r, 1500));
             if (!flujoActivo) return;
             const fin = await avanzarSiguiente();
@@ -400,7 +408,7 @@
         await detenerReconocimiento();
         btnEmpezar.disabled = false;
         btnParar.disabled = true;
-        estado.textContent = '⏸ Test detenido.';
+        estado.textContent = 'Test detenido.';
         logLine('Test detenido por el usuario.');
       }
 
@@ -430,8 +438,8 @@
             puntuacion = 0;
             actualizarPuntuacion();
             mostrarPregunta();
-            estado.textContent = `✅ Preguntas cargadas (${preguntas.length} preguntas). Pulsa "Empezar" para iniciar el test.`;
-            logLine(`Cargadas ${preguntas.length} preguntas desde fichero local.`);
+            estado.textContent = 'Preguntas cargadas (' + preguntas.length + ' preguntas). Pulsa "Empezar" para iniciar el test.';
+            logLine('Cargadas ' + preguntas.length + ' preguntas desde fichero local.');
           } catch (err) {
             console.error(err);
             estado.textContent = 'Error leyendo el fichero de preguntas.';
