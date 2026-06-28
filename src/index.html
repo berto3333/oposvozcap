@@ -44,6 +44,15 @@
         border-radius: 4px;
         white-space: pre-wrap;
       }
+      #log {
+        margin-top: 1rem;
+        font-size: 0.8rem;
+        background: #1a1a1a;
+        padding: 0.5rem;
+        border-radius: 4px;
+        max-height: 8rem;
+        overflow-y: auto;
+      }
     </style>
   </head>
   <body>
@@ -54,6 +63,7 @@
 
     <div id="status">Estado: parado</div>
     <div id="output">Aquí aparecerá el texto dictado…</div>
+    <div id="log"></div>
 
     <script type="module">
       import { SpeechRecognition } from '@capgo/capacitor-speech-recognition';
@@ -62,9 +72,25 @@
       const status = document.getElementById('status');
       const btnStart = document.getElementById('btn-start');
       const btnStop = document.getElementById('btn-stop');
+      const log = document.getElementById('log');
+
+      function logLine(text) {
+        console.log(text);
+        if (log) {
+          const line = document.createElement('div');
+          line.textContent = text;
+          log.appendChild(line);
+        }
+      }
+
+      function setOutput(text) {
+        output.textContent = text;
+        logLine('OUTPUT: ' + text);
+      }
 
       async function ensurePermissions() {
         const perms = await SpeechRecognition.checkPermissions();
+        logLine('PERMS: ' + JSON.stringify(perms));
         if (
           perms.microphone !== 'granted' ||
           perms.speechRecognition !== 'granted'
@@ -79,27 +105,54 @@
           await ensurePermissions();
 
           status.textContent = 'Estado: escuchando…';
+          setOutput('...');
+
+          // Por si acaso limpiamos listeners anteriores
+          SpeechRecognition.removeAllListeners?.();
 
           // resultados parciales mientras hablas
-          SpeechRecognition.addListener('partialResults', ({ value }) => {
-            if (value) {
-              output.textContent = value;
+          SpeechRecognition.addListener('partialResults', (data) => {
+            logLine('partialResults: ' + JSON.stringify(data));
+            const text = data.value || data.matches || '';
+            if (text) {
+              const finalText = Array.isArray(text) ? text.join(' ') : text;
+              setOutput(finalText);
             }
           });
 
-          // resultado final cuando termina la frase
-          SpeechRecognition.addListener('finalResult', ({ value }) => {
-            if (value) {
-              output.textContent = value;
+          // resultado final cuando termina
+          SpeechRecognition.addListener('results', (data) => {
+            logLine('results: ' + JSON.stringify(data));
+            const text = data.value || data.matches || '';
+            if (text) {
+              const finalText = Array.isArray(text) ? text.join(' ') : text;
+              setOutput(finalText);
               status.textContent = 'Estado: frase reconocida';
             }
           });
 
+          SpeechRecognition.addListener('error', (data) => {
+            logLine('error: ' + JSON.stringify(data));
+            status.textContent = 'Error: ' + JSON.stringify(data);
+          });
+
+          SpeechRecognition.addListener('speechStart', () => {
+            logLine('speechStart');
+            status.textContent = 'Estado: hablando…';
+          });
+
+          SpeechRecognition.addListener('speechEnd', () => {
+            logLine('speechEnd');
+            status.textContent = 'Estado: silencio…';
+          });
+
           await SpeechRecognition.start({
-            locale: 'es-ES', // castellano España
+            locale: 'es-ES',
+            partialResults: true
           });
         } catch (err) {
           console.error(err);
+          logLine('startListening error: ' + (err?.message || String(err)));
           status.textContent = 'Error al iniciar reconocimiento';
         }
       }
@@ -108,19 +161,16 @@
         try {
           await SpeechRecognition.stop();
           status.textContent = 'Estado: parado';
+          logLine('Reconocimiento parado manualmente');
         } catch (err) {
           console.error(err);
+          logLine('stopListening error: ' + (err?.message || String(err)));
           status.textContent = 'Error al parar reconocimiento';
         }
       }
 
-      btnStart.onclick = () => {
-        startListening();
-      };
-
-      btnStop.onclick = () => {
-        stopListening();
-      };
+      btnStart.onclick = startListening;
+      btnStop.onclick = stopListening;
     </script>
   </body>
 </html>
