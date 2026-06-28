@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <title>Oposvoz - Speech to Text</title>
+    <title>Oposvoz - Test por voz</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
       body {
@@ -16,33 +16,36 @@
         font-size: 1.4rem;
         margin-bottom: 1rem;
       }
+      .card {
+        background: #222;
+        border-radius: 6px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+      }
       button {
         margin-right: 0.5rem;
-        margin-bottom: 0.5rem;
+        margin-top: 0.5rem;
         padding: 0.6rem 1rem;
         border: none;
         border-radius: 4px;
         cursor: pointer;
       }
-      #btn-start {
+      #btn-leer {
+        background: #1976d2;
+        color: white;
+      }
+      #btn-voz {
         background: #2e7d32;
         color: white;
       }
-      #btn-stop {
+      #btn-parar {
         background: #c62828;
         color: white;
       }
-      #status {
+      #puntuacion,
+      #estado {
         margin-top: 0.5rem;
         font-size: 0.9rem;
-      }
-      #output {
-        margin-top: 1rem;
-        padding: 0.75rem;
-        min-height: 6rem;
-        background: #222;
-        border-radius: 4px;
-        white-space: pre-wrap;
       }
       #log {
         margin-top: 1rem;
@@ -53,39 +56,118 @@
         max-height: 8rem;
         overflow-y: auto;
       }
+      #opciones {
+        margin-top: 0.5rem;
+      }
+      .opcion {
+        display: block;
+        margin: 0.3rem 0;
+      }
     </style>
   </head>
   <body>
-    <h1>Oposvoz - Dictado a texto</h1>
+    <h1>Oposvoz - Test por voz</h1>
 
-    <button id="btn-start">Empezar a dictar</button>
-    <button id="btn-stop">Parar</button>
+    <div id="puntuacion">Puntuación: 0.00</div>
 
-    <div id="status">Estado: parado</div>
-    <div id="output">Aquí aparecerá el texto dictado…</div>
+    <div class="card">
+      <div id="pregunta-texto">Cargando preguntas…</div>
+      <div id="opciones"></div>
+    </div>
+
+    <button id="btn-leer">Leer pregunta</button>
+    <button id="btn-voz">Responder por voz</button>
+    <button id="btn-parar">Parar voz</button>
+
+    <div id="estado">Estado: esperando…</div>
     <div id="log"></div>
 
     <script type="module">
       import { SpeechRecognition } from '@capgo/capacitor-speech-recognition';
+      import { TextToSpeech } from '@capacitor-community/text-to-speech';
 
-      const output = document.getElementById('output');
-      const status = document.getElementById('status');
-      const btnStart = document.getElementById('btn-start');
-      const btnStop = document.getElementById('btn-stop');
-      const log = document.getElementById('log');
+      let preguntas = [];
+      let indiceActual = 0;
+      let puntuacion = 0;
+      let escuchando = false;
+
+      const preguntaTexto = document.getElementById('pregunta-texto');
+      const opcionesDiv = document.getElementById('opciones');
+      const puntuacionDiv = document.getElementById('puntuacion');
+      const estado = document.getElementById('estado');
+      const logDiv = document.getElementById('log');
+
+      const btnLeer = document.getElementById('btn-leer');
+      const btnVoz = document.getElementById('btn-voz');
+      const btnParar = document.getElementById('btn-parar');
 
       function logLine(text) {
         console.log(text);
-        if (log) {
+        if (logDiv) {
           const line = document.createElement('div');
           line.textContent = text;
-          log.appendChild(line);
+          logDiv.appendChild(line);
         }
       }
 
-      function setOutput(text) {
-        output.textContent = text;
-        logLine('OUTPUT: ' + text);
+      function actualizarPuntuacion() {
+        puntuacionDiv.textContent = 'Puntuación: ' + puntuacion.toFixed(2);
+      }
+
+      function mostrarPregunta() {
+        if (preguntas.length === 0) {
+          preguntaTexto.textContent = 'No hay preguntas cargadas.';
+          opcionesDiv.innerHTML = '';
+          return;
+        }
+
+        const p = preguntas[indiceActual];
+        preguntaTexto.textContent = `(${indiceActual + 1}/${preguntas.length}) ${p.texto}`;
+
+        opcionesDiv.innerHTML = '';
+        const letras = ['a', 'b', 'c', 'd'];
+        letras.forEach((letra) => {
+          const textoOpcion = p.opciones[letra];
+          if (!textoOpcion) return;
+
+          const div = document.createElement('div');
+          div.className = 'opcion';
+          div.textContent = `${letra.toUpperCase()}) ${textoOpcion}`;
+          opcionesDiv.appendChild(div);
+        });
+
+        estado.textContent =
+          'Estado: pregunta mostrada. Pulsa "Leer pregunta" o "Responder por voz".';
+      }
+
+      async function leerPreguntaActual() {
+        if (preguntas.length === 0) return;
+        const p = preguntas[indiceActual];
+
+        const letras = ['a', 'b', 'c', 'd'];
+        const partesOpciones = letras
+          .map((letra) => {
+            const textoOpcion = p.opciones[letra];
+            if (!textoOpcion) return null;
+            return `Opción ${letra.toUpperCase()}: ${textoOpcion}.`;
+          })
+          .filter(Boolean);
+
+        const textoTTS =
+          `Pregunta ${indiceActual + 1}. ${p.texto}. ` +
+          partesOpciones.join(' ') +
+          ' Di A, B, C o D para responder. Di repetir para repetir la pregunta, o di pasar para ir a la siguiente.';
+
+        logLine('TTS: ' + textoTTS);
+
+        await TextToSpeech.speak({
+          text: textoTTS,
+          locale: 'es-ES',
+          rate: 1.0
+        });
+
+        estado.textContent =
+          'Pregunta leída. Pulsa "Responder por voz" y di A, B, C, D, repetir o pasar.';
       }
 
       async function ensurePermissions() {
@@ -99,51 +181,134 @@
         }
       }
 
-      async function startListening() {
+      function parseComando(textoRaw) {
+        const texto = textoRaw.toLowerCase();
+        logLine('parseComando texto=' + texto);
+
+        if (texto.includes('repetir') || texto.includes('repita')) {
+          return { tipo: 'repetir' };
+        }
+        if (
+          texto.includes('pasar') ||
+          texto.includes('siguiente') ||
+          texto.includes('otra pregunta')
+        ) {
+          return { tipo: 'pasar' };
+        }
+
+        // Respuestas A/B/C/D
+        if (texto.match(/\b(a|á)\b/) || texto.includes('opción a')) {
+          return { tipo: 'respuesta', valor: 'a' };
+        }
+        if (texto.match(/\bb\b/) || texto.includes('opción b')) {
+          return { tipo: 'respuesta', valor: 'b' };
+        }
+        if (texto.match(/\bc\b/) || texto.includes('opción c')) {
+          return { tipo: 'respuesta', valor: 'c' };
+        }
+        if (texto.match(/\bd\b/) || texto.includes('opción d')) {
+          return { tipo: 'respuesta', valor: 'd' };
+        }
+
+        return { tipo: 'desconocido' };
+      }
+
+      async function corregirRespuestaVoz(valor) {
+        const p = preguntas[indiceActual];
+
+        if (valor === p.correcta) {
+          puntuacion += 0.25;
+          estado.textContent = `Correcta (${valor.toUpperCase()}). +0.25 puntos.`;
+          logLine(`Pregunta ${p.id}: correcta (${valor}).`);
+        } else {
+          puntuacion -= 0.1;
+          estado.textContent = `Incorrecta (${valor.toUpperCase()}). −0.1 puntos. Correcta era ${p.correcta.toUpperCase()}.`;
+          logLine(`Pregunta ${p.id}: incorrecta (${valor}), correcta (${p.correcta}).`);
+        }
+
+        actualizarPuntuacion();
+      }
+
+      async function pasarPregunta() {
+        const p = preguntas[indiceActual];
+        estado.textContent = `Pregunta ${p.id} pasada sin responder.`;
+        logLine(`Pregunta ${p.id}: pasada (0 puntos).`);
+
+        indiceActual++;
+        if (indiceActual >= preguntas.length) {
+          indiceActual = preguntas.length - 1;
+          estado.textContent = 'Has llegado al final del test.';
+          logLine('Fin del test.');
+        } else {
+          mostrarPregunta();
+          await leerPreguntaActual();
+        }
+      }
+
+      async function repetirPregunta() {
+        mostrarPregunta();
+        estado.textContent = 'Pregunta repetida.';
+        logLine(`Pregunta ${preguntas[indiceActual].id}: repetida.`);
+        await leerPreguntaActual();
+      }
+
+      async function startListeningComando() {
         try {
-          status.textContent = 'Estado: solicitando permisos…';
           await ensurePermissions();
 
-          status.textContent = 'Estado: escuchando…';
-          setOutput('...');
+          if (escuchando) {
+            logLine('Ya se está escuchando, ignorar startListeningComando');
+            return;
+          }
 
-          // Por si acaso limpiamos listeners anteriores
+          escuchando = true;
+          estado.textContent =
+            'Escuchando… Di A, B, C, D, repetir o pasar.';
+
           SpeechRecognition.removeAllListeners?.();
 
-          // resultados parciales mientras hablas
+          let bufferTexto = '';
+
           SpeechRecognition.addListener('partialResults', (data) => {
-            logLine('partialResults: ' + JSON.stringify(data));
             const text = data.value || data.matches || '';
-            if (text) {
-              const finalText = Array.isArray(text) ? text.join(' ') : text;
-              setOutput(finalText);
+            const finalText = Array.isArray(text) ? text.join(' ') : text;
+            if (finalText) {
+              bufferTexto = finalText;
+              logLine('partialResults: ' + bufferTexto);
             }
           });
 
-          // resultado final cuando termina
-          SpeechRecognition.addListener('results', (data) => {
-            logLine('results: ' + JSON.stringify(data));
+          SpeechRecognition.addListener('results', async (data) => {
             const text = data.value || data.matches || '';
-            if (text) {
-              const finalText = Array.isArray(text) ? text.join(' ') : text;
-              setOutput(finalText);
-              status.textContent = 'Estado: frase reconocida';
+            const finalText = Array.isArray(text) ? text.join(' ') : text;
+            logLine('results: ' + finalText);
+
+            const comando = parseComando(finalText || bufferTexto);
+
+            if (comando.tipo === 'respuesta') {
+              await corregirRespuestaVoz(comando.valor);
+              escuchando = false;
+            } else if (comando.tipo === 'repetir') {
+              await repetirPregunta();
+              escuchando = false;
+            } else if (comando.tipo === 'pasar') {
+              await pasarPregunta();
+              escuchando = false;
+            } else {
+              estado.textContent =
+                'No se ha entendido el comando. Di A, B, C, D, repetir o pasar.';
+              logLine('Comando desconocido, sigue escuchando.');
             }
           });
 
           SpeechRecognition.addListener('error', (data) => {
             logLine('error: ' + JSON.stringify(data));
-            status.textContent = 'Error: ' + JSON.stringify(data);
-          });
-
-          SpeechRecognition.addListener('speechStart', () => {
-            logLine('speechStart');
-            status.textContent = 'Estado: hablando…';
+            estado.textContent = 'Error en reconocimiento de voz.';
+            escuchando = false;
           });
 
           SpeechRecognition.addListener('speechEnd', () => {
             logLine('speechEnd');
-            status.textContent = 'Estado: silencio…';
           });
 
           await SpeechRecognition.start({
@@ -152,25 +317,56 @@
           });
         } catch (err) {
           console.error(err);
-          logLine('startListening error: ' + (err?.message || String(err)));
-          status.textContent = 'Error al iniciar reconocimiento';
+          logLine('startListeningComando error: ' + (err?.message || String(err)));
+          estado.textContent = 'Error al iniciar reconocimiento.';
+          escuchando = false;
         }
       }
 
       async function stopListening() {
         try {
           await SpeechRecognition.stop();
-          status.textContent = 'Estado: parado';
-          logLine('Reconocimiento parado manualmente');
+          escuchando = false;
+          estado.textContent = 'Estado: voz parada.';
+          logLine('Reconocimiento parado manualmente.');
         } catch (err) {
           console.error(err);
           logLine('stopListening error: ' + (err?.message || String(err)));
-          status.textContent = 'Error al parar reconocimiento';
         }
       }
 
-      btnStart.onclick = startListening;
-      btnStop.onclick = stopListening;
+      async function cargarPreguntas() {
+        try {
+          const resp = await fetch('/preguntas.dat');
+          if (!resp.ok) {
+            throw new Error('No se pudo cargar preguntas.dat');
+          }
+          preguntas = await resp.json();
+          logLine(`Cargadas ${preguntas.length} preguntas.`);
+          indiceActual = 0;
+          actualizarPuntuacion();
+          mostrarPregunta();
+        } catch (err) {
+          console.error(err);
+          preguntaTexto.textContent = 'Error cargando preguntas.dat';
+          estado.textContent = 'No se pudieron cargar las preguntas.';
+          logLine('Error al cargar preguntas: ' + (err?.message || String(err)));
+        }
+      }
+
+      btnLeer.onclick = () => {
+        leerPreguntaActual();
+      };
+
+      btnVoz.onclick = () => {
+        startListeningComando();
+      };
+
+      btnParar.onclick = () => {
+        stopListening();
+      };
+
+      cargarPreguntas();
     </script>
   </body>
 </html>

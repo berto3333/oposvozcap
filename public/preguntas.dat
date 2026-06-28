@@ -1,0 +1,46 @@
+[
+  {
+    "id": 1,
+    "texto": "¿Cuál es la capital de España?",
+    "opciones": {
+      "a": "Madrid",
+      "b": "Barcelona",
+      "c": "Sevilla",
+      "d": "Valencia"
+    },
+    "correcta": "a"
+  },
+  {
+    "id": 2,
+    "texto": "En un circuito digital, ¿qué componente se usa típicamente para almacenar un bit?",
+    "opciones": {
+      "a": "Resistor",
+      "b": "Flip-flop",
+      "c": "Inductor",
+      "d": "Condensador"
+    },
+    "correcta": "b"
+  },
+  {
+    "id": 3,
+    "texto": "¿Qué tipo de memoria es volátil y pierde su contenido al apagar el sistema?",
+    "opciones": {
+      "a": "ROM",
+      "b": "EEPROM",
+      "c": "RAM",
+      "d": "Flash NAND"
+    },
+    "correcta": "c"
+  },
+  {
+    "id": 4,
+    "texto": "¿Cuál es el valor lógico típico de una señal alta en CMOS de 3,3 voltios?",
+    "opciones": {
+      "a": "0 V",
+      "b": "1,8 V",
+      "c": "3,3 V",
+      "d": "-5 V"
+    },
+    "correcta": "c"
+  }
+]
