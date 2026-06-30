@@ -236,10 +236,12 @@
           puntuacion += 0.25;
           estado.textContent = 'Correcta (' + valor.toUpperCase() + '). +0.25 puntos.';
           logLine('Pregunta ' + p.id + ': correcta (' + valor + ').');
+          await TextToSpeech.speak({ text: 'Correcta', lang: 'es-ES', rate: 1.0 });
         } else {
           puntuacion -= 0.1;
           estado.textContent = 'Incorrecta (' + valor.toUpperCase() + '). −0.1 puntos. Correcta era ' + p.correcta.toUpperCase() + '.';
           logLine('Pregunta ' + p.id + ': incorrecta (' + valor + '), correcta (' + p.correcta + ').');
+          await TextToSpeech.speak({ text: 'Incorrecta. La respuesta correcta es la ' + p.correcta.toUpperCase(), lang: 'es-ES', rate: 1.0 });
         }
 
         actualizarPuntuacion();
