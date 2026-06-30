@@ -84,6 +84,7 @@
 
     <button id="btn-empezar">Empezar</button>
     <button id="btn-parar" disabled>Parar</button>
+    <button id="btn-pasar" disabled>Pasar pregunta</button>
 
     <div id="estado">Estado: esperando…</div>
     <div id="log"></div>
@@ -127,6 +128,7 @@
       const fileInput = document.getElementById('file-input');
       const btnEmpezar = document.getElementById('btn-empezar');
       const btnParar = document.getElementById('btn-parar');
+      const btnPasar = document.getElementById('btn-pasar');
 
       function logLine(text) {
         console.log(text);
@@ -207,6 +209,9 @@
         if (texto.includes('pasar') || texto.includes('siguiente') || texto.includes('otra pregunta')) {
           return { tipo: 'pasar' };
         }
+        if (texto.includes('ayuda') || texto.includes('ayúdame') || texto.includes('instrucciones') || texto.includes('que hago') || texto.includes('help')) {
+          return { tipo: 'ayuda' };
+        }
 
         if (texto.match(/\b(a|á)\b/) || texto.includes('opción a')) {
           return { tipo: 'respuesta', valor: 'a' };
@@ -258,8 +263,7 @@
 
         const textoTTS =
           'Pregunta ' + (indiceActual + 1) + '. ' + p.texto + '. ' +
-          partesOpciones.join(' ') +
-          ' Di A, B, C o D para responder. Di repetir para repetir la pregunta, o di pasar para ir a la siguiente.';
+          partesOpciones.join(' ');
 
         logLine('TTS: ' + textoTTS);
 
@@ -270,12 +274,35 @@
         });
       }
 
+      async function leerInstrucciones() {
+        const texto = 'Hay que responder a las preguntas con a, b, c o d. Repetir para repetir la pregunta actual. Pasar para pasar la pregunta actual. Ayuda para que me repita todo esto.';
+        await TextToSpeech.speak({ text: texto, lang: 'es-ES', rate: 1.0 });
+      }
+
+      function emitirBeep() {
+        try {
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          if (audioCtx.state === 'suspended') audioCtx.resume();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = 800;
+          gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(audioCtx.currentTime);
+          osc.stop(audioCtx.currentTime + 0.3);
+        } catch (e) { /* ignore */ }
+      }
+
       async function avanzarSiguiente() {
         indiceActual++;
         if (indiceActual >= preguntas.length) {
           flujoActivo = false;
           btnEmpezar.disabled = false;
           btnParar.disabled = true;
+          btnPasar.disabled = true;
           estado.textContent = 'Test completado. Puntuación final: ' + puntuacion.toFixed(2);
           liberarWakeLock();
           logLine('Fin del test.');
@@ -312,8 +339,14 @@
           const fin = await avanzarSiguiente();
           if (!fin) await iniciarCiclo();
 
+        } else if (comando.tipo === 'ayuda') {
+          estado.textContent = 'Mostrando ayuda…';
+          await leerInstrucciones();
+          if (!flujoActivo) return;
+          await escucharComando();
+
         } else {
-          estado.textContent = 'No se ha entendido: "' + texto.substring(0, 60) + '". Di A, B, C, D, repetir o pasar.';
+          estado.textContent = 'No se ha entendido: "' + texto.substring(0, 60) + '". Intenta de nuevo o di ayuda.';
           await new Promise(r => setTimeout(r, 1500));
           if (!flujoActivo) return;
           await escucharComando();
@@ -328,6 +361,7 @@
 
         if (!flujoActivo) return;
 
+        emitirBeep();
         await escucharComando();
       }
 
@@ -423,11 +457,14 @@
         flujoActivo = true;
         btnEmpezar.disabled = true;
         btnParar.disabled = false;
+        btnPasar.disabled = false;
         actualizarPuntuacion();
         mostrarPregunta();
         await adquirirWakeLock();
         logLine('--- INICIO DEL TEST ---');
 
+        await leerInstrucciones();
+        if (!flujoActivo) return;
         await iniciarCiclo();
       }
 
@@ -437,9 +474,25 @@
         await detenerReconocimiento();
         btnEmpezar.disabled = false;
         btnParar.disabled = true;
+        btnPasar.disabled = true;
         estado.textContent = 'Test detenido.';
         liberarWakeLock();
         logLine('Test detenido por el usuario.');
+      }
+
+      async function pasarClicked() {
+        if (!flujoActivo) return;
+        sesionTerminada = true;
+        limpiarTimeout();
+        await detenerReconocimiento();
+        try { await TextToSpeech.stop(); } catch (e) { /* ignore */ }
+        const p = preguntas[ordenPreguntas[indiceActual]];
+        estado.textContent = 'Pregunta pasada manualmente.';
+        logLine('Pregunta ' + p.id + ': pasada manualmente (0 puntos).');
+        await new Promise(r => setTimeout(r, 1000));
+        if (!flujoActivo) return;
+        const fin = await avanzarSiguiente();
+        if (!fin) await iniciarCiclo();
       }
 
       btnCargar.onclick = () => {
@@ -484,6 +537,7 @@
 
       btnEmpezar.onclick = empezarClicked;
       btnParar.onclick = pararClicked;
+      btnPasar.onclick = pasarClicked;
     </script>
   </body>
 </html>
