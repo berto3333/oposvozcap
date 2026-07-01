@@ -241,7 +241,7 @@
           puntuacion -= 0.1;
           estado.textContent = 'Incorrecta (' + valor.toUpperCase() + '). −0.1 puntos. Correcta era ' + p.correcta.toUpperCase() + '.';
           logLine('Pregunta ' + p.id + ': incorrecta (' + valor + '), correcta (' + p.correcta + ').');
-          await TextToSpeech.speak({ text: 'Incorrecta. La respuesta correcta es la ' + p.correcta.toUpperCase(), lang: 'es-ES', rate: 1.0 });
+          await TextToSpeech.speak({ text: 'Incorrecta. La respuesta correcta es la ' + p.correcta.toUpperCase() + '. ' + p.opciones[p.correcta], lang: 'es-ES', rate: 1.0 });
         }
 
         actualizarPuntuacion();
